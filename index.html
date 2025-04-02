@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fox Lake Masters - Score Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Optional Tailwind configuration (can define custom colors if needed)
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        launchBg: '#006747', // Pantone 342 C for launch screen
+                        launchButton: '#facc15', // yellow-400
+                        launchButtonHover: '#eab308', // yellow-500
+                        launchButtonText: '#006747', // Match launch bg
+                        leaderHighlight: '#f0fdf4', // green-50
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Basic styles for input fields */
+        input[type="number"], input[type="text"] {
+            border: 1px solid #ccc; border-radius: 0.25rem; padding: 0.25rem 0.5rem;
+        }
+        input[type="number"].score-input { width: 4em; text-align: center; }
+        /* Hide number input spinners */
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; /* Firefox */ }
+
+        /* Style for active NAV button */
+        .nav-active { background-color: #eff6ff; color: #2563eb; } /* bg-blue-100 text-blue-700 */
+        /* Style for active ROUND tab */
+        .tab-active { border-color: #3b82f6; background-color: #eff6ff; color: #2563eb; font-weight: 600; } /* blue-500 border, blue-50 bg, blue-600 text */
+
+        /* Sticky header and player column styles for Score Table */
+        #score-table-container th:first-child, #score-table-container td:first-child { position: sticky; left: 0; z-index: 10; background-color: inherit; }
+        #score-table-container thead th { position: sticky; top: 0; z-index: 20; background-color: #f9fafb; /* bg-gray-50 */ }
+        #score-table-container thead tr:nth-child(2) th { top: 2.25rem; }
+        #score-table-container thead tr:nth-child(3) th { top: 4.5rem; }
+        #score-table-container thead th:first-child { z-index: 30; }
+        #score-table-container tbody td:first-child { background-color: #ffffff; /* bg-white */ }
+
+        /* Ensure hidden class works */
+        .hidden { display: none; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <div id="launch-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-launchBg text-white p-8">
+        <img
+            src="https://i.imgur.com/eIfvage.jpeg" alt="Fox Lake Masters Logo"
+            class="max-w-xs sm:max-w-sm md:max-w-md mb-8 rounded shadow-lg"
+            onerror="this.onerror=null; this.src='https://placehold.co/300x150/006747/FFF?text=Logo+Error'; this.alt='Logo Error';"
+        />
+        <button id="start-button" class="bg-launchButton hover:bg-launchButtonHover text-launchButtonText font-bold py-3 px-8 rounded-lg text-lg transition duration-150 ease-in-out shadow-md">
+            Welcome
+        </button>
+    </div>
+
+    <div id="main-app-area" class="hidden">
+        <nav id="navigation-bar" class="bg-white shadow-md mb-4 sm:mb-6 sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-center sm:justify-start items-center h-16">
+                    <div id="nav-buttons" class="flex space-x-4">
+                        </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="p-4 md:p-8">
+
+            <div id="tracker-view">
+                <div class="max-w-7xl mx-auto">
+                    <div class="flex items-center justify-center mb-2 pt-4">
+                         <img src="https://i.imgur.com/9tPiAv5.png" alt="Fox Lake Masters Alternate Logo" class="h-24 sm:h-32 w-auto mr-3" onerror="this.onerror=null; this.src='https://placehold.co/128x128/eeeeee/999999?text=Logo'; this.alt='Logo Error';"/>
+                        <h1 class="text-2xl sm:text-3xl font-bold text-center text-gray-800">Fox Lake Masters</h1>
+                        <img src="https://i.imgur.com/K2Piqqd.png" alt="Fox Lake Logo Graphic" class="h-24 sm:h-32 w-auto ml-3" onerror="this.onerror=null; this.src='https://placehold.co/128x128/eeeeee/999999?text=Logo'; this.alt='Logo Error';"/>
+                    </div>
+                    <p class="text-center text-gray-600 mb-6">Fox Lake Golf Club</p>
+
+                    <div class="mb-6 p-4 border border-gray-200 rounded-lg bg-white shadow-sm">
+                        <h2 class="text-xl font-semibold text-gray-700 mb-3">Players</h2>
+                        <div id="player-list" class="flex flex-wrap gap-2 mb-3"> </div>
+                        <div class="flex flex-col sm:flex-row gap-2">
+                            <input type="text" id="new-player-name" placeholder="Player name" class="flex-grow p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            <input type="number" id="new-player-handicap" placeholder="Handicap" class="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-32"/>
+                            <button id="add-player-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md transition duration-150 ease-in-out">Add Player</button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">Note: Player data is stored locally in this browser.</p>
+                    </div>
+
+                    <div class="mb-6"> <div class="border-b border-gray-200"> <nav id="round-tabs" class="-mb-px flex space-x-2 sm:space-x-4 overflow-x-auto" aria-label="Tabs"> </nav> </div> </div>
+
+                    <div class="mb-6 p-4 border border-gray-200 rounded-lg bg-white shadow-sm">
+                         <h2 class="text-xl font-semibold text-gray-700 mb-4">Enter Scores - <span id="current-round-display">Round 1</span></h2>
+                         <div id="score-table-container" class="overflow-x-auto relative"> </div>
+                    </div>
+
+                    <div class="p-4 border border-gray-200 rounded-lg bg-white shadow-sm">
+                        <h2 class="text-xl font-semibold text-gray-700 mb-4">Live Leaderboard (Sorted by Net Score)</h2>
+                        <div id="leaderboard" class="overflow-x-auto"> </div>
+                         <p id="course-par-info" class="text-sm text-gray-600 mt-2"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="history-view" class="hidden">
+                 <div class="mb-6 p-4 border border-gray-200 rounded-lg bg-white shadow-sm">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-3">History</h2>
+                    <div id="history-content" class="aspect-video w-full">
+                         </div>
+                     <p class="text-xs text-gray-500 mt-2">
+                        Note: The embedded sheet above must be published to the web via Google Sheets
+                        (File &gt; Share &gt; Publish to web) to be visible.
+                     </p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- Constants ---
+        const NUM_ROUNDS = 4;
+        const NUM_HOLES = 18;
+        const LOCAL_STORAGE_KEY_PLAYERS = 'golfTrackerPlayers';
+        const LOCAL_STORAGE_KEY_ID = 'golfTrackerNextPlayerId';
+        const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTRW2wQZbEYgsKgYNwKofjhUWsSYQIY0Y5IDqYhk3aqw-bGfrX8Ct2zYk5heRLr3Tw7EPH2DdSPhK1h/pubhtml";
+
+        // --- Course Data ---
+        // Ensure COURSE_DATA is defined here
+        const COURSE_DATA = [
+            { hole: 1, par: 4, yards: 370 }, { hole: 2, par: 4, yards: 336 }, { hole: 3, par: 5, yards: 512 },
+            { hole: 4, par: 3, yards: 164 }, { hole: 5, par: 5, yards: 511 }, { hole: 6, par: 3, yards: 178 },
+            { hole: 7, par: 4, yards: 367 }, { hole: 8, par: 4, yards: 338 }, { hole: 9, par: 4, yards: 326 },
+            { hole: 10, par: 3, yards: 180 }, { hole: 11, par: 4, yards: 398 }, { hole: 12, par: 4, yards: 469 },
+            { hole: 13, par: 4, yards: 306 }, { hole: 14, par: 4, yards: 430 }, { hole: 15, par: 5, yards: 544 },
+            { hole: 16, par: 3, yards: 202 }, { hole: 17, par: 4, yards: 394 }, { hole: 18, par: 5, yards: 516 }
+        ];
+        const COURSE_TOTAL_PAR = COURSE_DATA.reduce((sum, hole) => sum + hole.par, 0);
+
+        // --- Global State Variables ---
+        let players = [];
+        let currentView = 'launch'; // 'launch', 'tracker', 'history'
+        let currentRound = 1;
+        let nextPlayerIdCounter = 4; // Default starting ID
+
+        // --- DOM Element References --- (Get references in initializeApp)
+        let launchScreenEl, mainAppAreaEl, navigationBarEl, navButtonsEl;
+        let trackerViewEl, historyViewEl;
+        let playerListEl, newPlayerNameInputEl, newPlayerHandicapInputEl, addPlayerBtnEl;
+        let roundTabsEl, currentRoundDisplayEl, scoreTableContainerEl;
+        let leaderboardEl, courseParInfoEl, historyContentEl;
+
+        // --- Helper Functions ---
+        // Ensure helper functions are defined here
+        const calculateRoundTotal = (player, roundNum) => {
+            const roundScores = player.scores?.[`round${roundNum}`];
+            if (!roundScores) return 0;
+            return Object.values(roundScores).reduce((sum, score) => sum + (typeof score === 'number' ? score : 0), 0);
+        };
+        const calculateCumulativeGrossTotal = (player) => {
+            let total = 0;
+            for (let r = 1; r <= NUM_ROUNDS; r++) { total += calculateRoundTotal(player, r); }
+            return total;
+        };
+        const calculateCumulativeNetTotal = (player) => {
+            const grossTotal = calculateCumulativeGrossTotal(player);
+            const handicap = typeof player.handicap === 'number' ? player.handicap : 0;
+            return grossTotal - handicap;
+        };
+        const calculateCumulativeRelativeToPar = (player) => {
+            let totalRelativeToPar = 0;
+            for (let r = 1; r <= NUM_ROUNDS; r++) {
+                const roundScores = player.scores?.[`round${r}`];
+                if (roundScores) {
+                    for (let h = 1; h <= NUM_HOLES; h++) {
+                        const score = roundScores[`hole${h}`];
+                        if (typeof score === 'number' && score !== null) {
+                            const holePar = COURSE_DATA[h - 1]?.par;
+                            if (typeof holePar === 'number') { totalRelativeToPar += (score - holePar); }
+                        }
+                    }
+                }
+            }
+            return totalRelativeToPar;
+        };
+        const formatRelativeToPar = (score) => {
+            if (score > 0) return `+${score}`;
+            if (score === 0) return 'E';
+            return `${score}`;
+        };
+
+        // --- Persistence Functions ---
+        function saveState() {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY_PLAYERS, JSON.stringify(players));
+                localStorage.setItem(LOCAL_STORAGE_KEY_ID, nextPlayerIdCounter.toString());
+            } catch (error) {
+                console.error("Error saving state to localStorage:", error);
+            }
+        }
+
+        function loadState() {
+            try {
+                const savedPlayers = localStorage.getItem(LOCAL_STORAGE_KEY_PLAYERS);
+                if (savedPlayers) {
+                    const parsed = JSON.parse(savedPlayers);
+                    if (Array.isArray(parsed)) {
+                        players = parsed;
+                    } else {
+                         console.warn("Invalid player data found in localStorage.");
+                         players = []; // Reset if invalid
+                    }
+                } else {
+                    players = []; // Start empty if nothing saved
+                }
+
+                const savedId = localStorage.getItem(LOCAL_STORAGE_KEY_ID);
+                const parsedId = savedId ? parseInt(savedId, 10) : NaN;
+                nextPlayerIdCounter = !isNaN(parsedId) && parsedId >= 1 ? parsedId : 1; // Start ID counter from 1 or saved value
+
+            } catch (error) {
+                console.error("Error loading state from localStorage:", error);
+                players = []; // Reset on error
+                nextPlayerIdCounter = 1;
+            }
+        }
+
+        // --- Navigation ---
+        function navigateTo(view) {
+            currentView = view;
+
+            // Hide all main views
+            if (trackerViewEl) trackerViewEl.classList.add('hidden');
+            if (historyViewEl) historyViewEl.classList.add('hidden');
+
+            // Show/Hide main area and nav bar
+            if (view === 'launch') {
+                if (mainAppAreaEl) mainAppAreaEl.classList.add('hidden');
+                if (launchScreenEl) launchScreenEl.classList.remove('hidden');
+            } else {
+                if (launchScreenEl) launchScreenEl.classList.add('hidden');
+                if (mainAppAreaEl) mainAppAreaEl.classList.remove('hidden');
+
+                // Show the specific view
+                if (view === 'tracker' && trackerViewEl) {
+                    trackerViewEl.classList.remove('hidden');
+                    // Re-render tracker components
+                    renderRoundTabs();
+                    renderScoreTable();
+                    renderLeaderboard();
+                    renderPlayerList();
+                } else if (view === 'history' && historyViewEl) {
+                    historyViewEl.classList.remove('hidden');
+                    renderHistoryView(); // Render iframe content
+                }
+                 if (navButtonsEl) renderNavButtons(); // Update active state
+            }
+        }
+
+        // --- Rendering Functions ---
+
+        function renderNavButtons() {
+            if (!navButtonsEl) return; // Check if element exists
+            const navItems = [
+                { view: 'tracker', label: 'Tracker' },
+                { view: 'history', label: 'History' },
+                { view: 'launch', label: 'Home' }
+            ];
+            navButtonsEl.innerHTML = navItems.map(item => `
+                <button data-view="${item.view}"
+                    class="nav-button px-3 py-2 rounded-md text-sm font-medium transition duration-150 ease-in-out ${
+                        currentView === item.view ? 'nav-active' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                    }"
+                >${item.label}</button>
+            `).join('');
+
+            // Add event listeners after rendering
+            navButtonsEl.querySelectorAll('.nav-button').forEach(button => {
+                button.addEventListener('click', (e) => navigateTo(e.target.dataset.view));
+            });
+        }
+
+        function renderPlayerList() {
+            if (!playerListEl) return;
+            if (players.length === 0) {
+                playerListEl.innerHTML = '<p class="text-gray-500">No players added yet.</p>'; return;
+            }
+            playerListEl.innerHTML = players.map(player => `
+                <span class="bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded inline-flex items-center">
+                    ${player.name} (HCP: ${player.handicap})
+                    <button data-player-id="${player.id}" class="remove-player-btn ml-1.5 text-blue-600 hover:text-blue-800 font-bold focus:outline-none" aria-label="Remove ${player.name}">&times;</button>
+                </span>
+            `).join('');
+
+            // Add event listeners for remove buttons
+            playerListEl.querySelectorAll('.remove-player-btn').forEach(button => {
+                button.addEventListener('click', handleRemovePlayer);
+            });
+        }
+
+        function renderRoundTabs() {
+            if (!roundTabsEl || !currentRoundDisplayEl) return;
+            let tabsHtml = '';
+            for (let r = 1; r <= NUM_ROUNDS; r++) {
+                tabsHtml += `
+                    <button data-round="${r}" class="round-tab-btn whitespace-nowrap px-3 py-2 font-medium text-sm rounded-t-md border-b-2 transition duration-150 ease-in-out ${
+                        r === currentRound ? 'tab-active' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }"> Round ${r} </button>
+                `;
+            }
+            roundTabsEl.innerHTML = tabsHtml;
+             currentRoundDisplayEl.textContent = `Round ${currentRound}`;
+
+            // Add event listeners
+             roundTabsEl.querySelectorAll('.round-tab-btn').forEach(button => {
+                button.addEventListener('click', handleRoundChange);
+            });
+        }
+
+        function renderScoreTable() {
+            if (!scoreTableContainerEl) return;
+            if (players.length === 0) {
+                 scoreTableContainerEl.innerHTML = '<p class="text-gray-500">Add players to start entering scores.</p>'; return;
+            }
+
+            let tableHtml = '<table class="min-w-full divide-y divide-gray-200 border border-gray-200">';
+            // Table Header
+            tableHtml += '<thead class="bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider">';
+            tableHtml += '<tr class="text-left"><th scope="col" class="px-3 py-2 sticky left-0 bg-gray-50 z-10"></th>'; // Blank top-left
+            for (let h = 1; h <= NUM_HOLES; h++) { tableHtml += `<th scope="col" class="px-2 py-2 text-center w-16">H${h}</th>`; }
+            tableHtml += '<th scope="col" class="px-3 py-2 text-center font-semibold">Round Total</th></tr>';
+            tableHtml += '<tr class="text-left"><th scope="col" class="px-3 py-1 sticky left-0 bg-gray-50 z-10 text-gray-400 font-normal">Yards</th>';
+            COURSE_DATA.forEach(hole => { tableHtml += `<th scope="col" class="px-2 py-1 text-center font-normal text-gray-400">${hole.yards}</th>`; });
+            tableHtml += '<th scope="col" class="px-3 py-1 text-center font-normal text-gray-400"></th></tr>';
+            tableHtml += '<tr class="text-left"><th scope="col" class="px-3 py-1 sticky left-0 bg-gray-50 z-10">Par</th>';
+            COURSE_DATA.forEach(hole => { tableHtml += `<th scope="col" class="px-2 py-1 text-center font-semibold">${hole.par}</th>`; });
+            tableHtml += `<th scope="col" class="px-3 py-1 text-center font-bold">${COURSE_TOTAL_PAR}</th></tr>`;
+            tableHtml += '</thead>';
+
+            // Table Body
+            tableHtml += '<tbody class="bg-white divide-y divide-gray-200">';
+            players.forEach(player => {
+                tableHtml += `<tr><td class="font-medium text-gray-900 sticky left-0 bg-white z-10 px-3 py-2 whitespace-nowrap">${player.name}</td>`;
+                const roundKey = `round${currentRound}`;
+                for (let h = 1; h <= NUM_HOLES; h++) {
+                    const holeKey = `hole${h}`;
+                    const score = player.scores?.[roundKey]?.[holeKey] ?? '';
+                    // Ensure data attributes are correctly quoted
+                    tableHtml += `<td class="px-1 py-1 text-center"><input type="number" min="1" value="${score}" data-player-id="${player.id}" data-hole="${h}" class="score-input w-12 text-sm text-center border border-gray-300 rounded-md focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50"></td>`;
+                }
+                const roundTotal = calculateRoundTotal(player, currentRound);
+                tableHtml += `<td class="text-center font-semibold px-3 py-2">${roundTotal}</td></tr>`;
+            });
+            tableHtml += '</tbody></table>';
+            scoreTableContainerEl.innerHTML = tableHtml;
+
+            // Add event listeners for score inputs
+            scoreTableContainerEl.querySelectorAll('.score-input').forEach(input => {
+                input.addEventListener('change', handleScoreChange);
+            });
+        }
+
+        function renderLeaderboard() {
+            if (!leaderboardEl || !courseParInfoEl) return;
+             courseParInfoEl.textContent = `Course Par: ${COURSE_TOTAL_PAR}`;
+             if (players.length === 0) {
+                leaderboardEl.innerHTML = '<p class="text-gray-500">Add players and enter scores to see the leaderboard.</p>'; return;
+            }
+
+            const leaderboardData = players.map(p => ({ ...p, cumulativeGrossTotal: calculateCumulativeGrossTotal(p), cumulativeNetTotal: calculateCumulativeNetTotal(p), cumulativeToPar: calculateCumulativeRelativeToPar(p) })).sort((a, b) => a.cumulativeNetTotal - b.cumulativeNetTotal);
+
+            let tableHtml = '<table class="min-w-full divide-y divide-gray-200 border border-gray-200"><thead class="bg-gray-50"><tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">';
+            tableHtml += '<th scope="col" class="px-4 py-3 text-center">Rank</th><th scope="col" class="px-4 py-3">Player</th><th scope="col" class="px-4 py-3 text-center">HCP</th><th scope="col" class="px-4 py-3 text-center">Gross</th><th scope="col" class="px-4 py-3 text-center font-bold">Net</th><th scope="col" class="px-4 py-3 text-center font-bold">To Par</th>';
+            for(let r=1; r<=NUM_ROUNDS; r++) { tableHtml += `<th scope="col" class="px-4 py-3 text-center">R${r} Gross</th>`; }
+            tableHtml += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
+
+            leaderboardData.forEach((player, index) => {
+                const toParClass = player.cumulativeToPar === 0 ? 'text-black' : (player.cumulativeToPar > 0 ? 'text-red-600' : 'text-green-600');
+                tableHtml += `<tr class="${index === 0 ? 'bg-green-50' : ''}">`; // Using Tailwind class directly
+                tableHtml += `<td class="px-4 py-2 whitespace-nowrap text-center font-medium">${index + 1}</td>`;
+                tableHtml += `<td class="px-4 py-2 whitespace-nowrap font-medium text-gray-900">${player.name}</td>`;
+                tableHtml += `<td class="px-4 py-2 whitespace-nowrap text-center">${player.handicap}</td>`;
+                tableHtml += `<td class="px-4 py-2 whitespace-nowrap text-center">${player.cumulativeGrossTotal}</td>`;
+                tableHtml += `<td class="px-4 py-2 whitespace-nowrap text-center font-bold text-lg text-blue-600">${player.cumulativeNetTotal}</td>`;
+                tableHtml += `<td class="px-4 py-2 whitespace-nowrap text-center font-bold text-lg ${toParClass}">${formatRelativeToPar(player.cumulativeToPar)}</td>`;
+                for(let r=1; r<=NUM_ROUNDS; r++) { tableHtml += `<td class="px-4 py-2 whitespace-nowrap text-center">${calculateRoundTotal(player, r)}</td>`; }
+                tableHtml += '</tr>';
+            });
+            tableHtml += '</tbody></table>';
+            leaderboardEl.innerHTML = tableHtml;
+        }
+
+        function renderHistoryView() {
+            if (!historyContentEl) return;
+            // Check if URL is defined and not the placeholder before rendering
+            if (GOOGLE_SHEET_URL && GOOGLE_SHEET_URL !== "YOUR_PUBLISHED_GOOGLE_SHEET_EMBED_URL_HERE") {
+                 historyContentEl.innerHTML = `
+                    <iframe
+                        src="${GOOGLE_SHEET_URL}"
+                        title="Golf History Google Sheet"
+                        class="w-full h-full border-0"
+                    >Loading Google Sheet...</iframe>
+                `;
+            } else {
+                 // Display a message if the URL is still the placeholder or undefined
+                 historyContentEl.innerHTML = `<p class="text-red-600 p-4">Google Sheet URL is not configured. Please update the GOOGLE_SHEET_URL constant in the script.</p>`;
+            }
+        }
+
+        // --- Event Handlers ---
+        function handleStartClick() {
+            navigateTo('tracker');
+        }
+
+        function handleAddPlayer() {
+            const name = newPlayerNameInputEl.value.trim();
+            const handicapStr = newPlayerHandicapInputEl.value.trim();
+            const handicap = (handicapStr === '' || isNaN(parseInt(handicapStr, 10))) ? 0 : parseInt(handicapStr, 10);
+
+            if (!name) { alert("Please enter a player name."); return; }
+            if (players.some(p => p.name.toLowerCase() === name.toLowerCase())) { alert(`Player "${name}" already exists.`); return; }
+
+            const newId = nextPlayerIdCounter++; // Use current ID then increment
+            const newPlayer = { id: newId, name: name, handicap: handicap, scores: {} };
+            players.push(newPlayer);
+
+            newPlayerNameInputEl.value = '';
+            newPlayerHandicapInputEl.value = '';
+
+            saveState();
+            renderPlayerList();
+            renderScoreTable(); // Need to re-render table to include new player row
+            renderLeaderboard();
+        }
+
+        function handleRemovePlayer(event) {
+            const playerId = parseInt(event.target.dataset.playerId, 10);
+            players = players.filter(p => p.id !== playerId);
+            saveState();
+            renderPlayerList();
+            renderScoreTable(); // Re-render table to remove player row
+            renderLeaderboard();
+        }
+
+         function handleScoreChange(event) {
+            const input = event.target;
+            const playerId = parseInt(input.dataset.playerId, 10);
+            const holeNum = parseInt(input.dataset.hole, 10);
+            const scoreStr = input.value;
+            const score = scoreStr === '' ? null : parseInt(scoreStr, 10);
+
+            if (scoreStr !== '' && (isNaN(score) || score < 0)) {
+                alert("Please enter a valid positive number for the score.");
+                const player = players.find(p => p.id === playerId);
+                const prevScore = player?.scores?.[`round${currentRound}`]?.[`hole${holeNum}`] ?? '';
+                input.value = prevScore;
+                return;
+            }
+
+            const player = players.find(p => p.id === playerId);
+            if (player) {
+                 const roundKey = `round${currentRound}`;
+                 const holeKey = `hole${holeNum}`;
+                 if (!player.scores) player.scores = {};
+                 if (!player.scores[roundKey]) player.scores[roundKey] = {};
+                 player.scores[roundKey][holeKey] = score;
+
+                 saveState();
+                 renderScoreTable(); // Re-render to update round total
+                 renderLeaderboard();
+            }
+        }
+
+         function handleRoundChange(event) {
+            const newRound = parseInt(event.target.dataset.round, 10);
+            if (newRound !== currentRound) {
+                currentRound = newRound;
+                renderRoundTabs(); // Update active tab style
+                renderScoreTable(); // Render table for new round
+            }
+        }
+
+        // --- Initialization ---
+        function initializeApp() {
+            // Get DOM elements
+            launchScreenEl = document.getElementById('launch-screen');
+            mainAppAreaEl = document.getElementById('main-app-area');
+            navigationBarEl = document.getElementById('navigation-bar');
+            navButtonsEl = document.getElementById('nav-buttons');
+            trackerViewEl = document.getElementById('tracker-view');
+            historyViewEl = document.getElementById('history-view');
+            playerListEl = document.getElementById('player-list');
+            newPlayerNameInputEl = document.getElementById('new-player-name');
+            newPlayerHandicapInputEl = document.getElementById('new-player-handicap');
+            addPlayerBtnEl = document.getElementById('add-player-btn');
+            roundTabsEl = document.getElementById('round-tabs');
+            currentRoundDisplayEl = document.getElementById('current-round-display');
+            scoreTableContainerEl = document.getElementById('score-table-container');
+            leaderboardEl = document.getElementById('leaderboard');
+            courseParInfoEl = document.getElementById('course-par-info');
+            historyContentEl = document.getElementById('history-content');
+
+             // Check if all essential elements were found
+             if (!launchScreenEl || !mainAppAreaEl || !addPlayerBtnEl /* add other checks if needed */) {
+                 console.error("Initialization failed: Could not find essential DOM elements.");
+                 // Optionally display an error message to the user
+                 document.body.innerHTML = '<p class="text-red-600 p-4">Error: Application could not initialize correctly. Essential elements missing.</p>';
+                 return;
+             }
+
+            // Load state from localStorage
+            loadState();
+
+            // Add initial event listeners
+            document.getElementById('start-button').addEventListener('click', handleStartClick);
+            addPlayerBtnEl.addEventListener('click', handleAddPlayer);
+            // Add keypress listeners for player input
+             newPlayerNameInputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleAddPlayer(); });
+             newPlayerHandicapInputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleAddPlayer(); });
+
+            // Set initial view
+            navigateTo('launch'); // Start with the launch screen
+        }
+
+        // --- Run Initialization on Load ---
+        window.addEventListener('load', initializeApp);
+
+    </script>
+
+</body>
+</html>
